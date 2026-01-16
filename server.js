@@ -1,136 +1,102 @@
+// =============================================================================
 // BASE SETUP
 // =============================================================================
 import express from 'express';
 import bodyParser from 'body-parser';
 import mongoose from 'mongoose';
+import morgan from 'morgan';
+import Bear from './app/models/bear.js';
 
-// call the packages we need
 const app = express();
+const port = process.env.PORT || 8080;
 
-// configure app
-app.use(morgan('dev')); // log requests to the console
-
-// configure body parser
+// =============================================================================
+// APP CONFIG
+// =============================================================================
+app.use(morgan('dev'));
 app.use(bodyParser.json());
 
-app.get('/', (req, res) => {
-  res.send('API Node.js OK');
-});
-
-var port     = process.env.PORT || 8080; // set our port
-
-// DATABASE SETUP
-var mongoose   = require('mongoose');
-mongoose.connect('mongodb://node:node@novus.modulusmongo.net:27017/Iganiq8o'); // connect to our database
-
-// Handle the connection event
-var db = mongoose.connection;
-db.on('error', console.error.bind(console, 'connection error:'));
-
-db.once('open', function() {
-  console.log("DB connection alive");
-});
-
-// Bear models lives here
-var Bear     = require('./app/models/bear');
-
-// ROUTES FOR OUR API
 // =============================================================================
+// DATABASE SETUP
+// =============================================================================
+mongoose
+  .connect('mongodb://node:node@novus.modulusmongo.net:27017/Iganiq8o')
+  .then(() => console.log('DB connection alive'))
+  .catch(err => console.error('MongoDB connection error:', err));
 
-// create our router
-var router = express.Router();
+// =============================================================================
+// ROUTES
+// =============================================================================
+const router = express.Router();
 
-// middleware to use for all requests
-router.use(function(req, res, next) {
-	// do logging
-	console.log('Something is happening.');
-	next();
+router.use((req, res, next) => {
+  console.log('Something is happening.');
+  next();
 });
 
-// test route to make sure everything is working (accessed at GET http://localhost:8080/api)
-router.get('/', function(req, res) {
-	res.json({ message: 'hooray! welcome to our api!' });	
+router.get('/', (req, res) => {
+  res.json({ message: 'hooray! welcome to our api!' });
 });
 
-// on routes that end in /bears
-// ----------------------------------------------------
-router.route('/bears')
+// /bears
+router
+  .route('/bears')
+  .post(async (req, res) => {
+    try {
+      const bear = new Bear({ name: req.body.name });
+      await bear.save();
+      res.json({ message: 'Bear created!' });
+    } catch (err) {
+      res.status(500).send(err);
+    }
+  })
+  .get(async (req, res) => {
+    try {
+      const bears = await Bear.find();
+      res.json(bears);
+    } catch (err) {
+      res.status(500).send(err);
+    }
+  });
 
-	// create a bear (accessed at POST http://localhost:8080/bears)
-	.post(function(req, res) {
-		
-		var bear = new Bear();		// create a new instance of the Bear model
-		bear.name = req.body.name;  // set the bears name (comes from the request)
+// /bears/:bear_id
+router
+  .route('/bears/:bear_id')
+  .get(async (req, res) => {
+    try {
+      const bear = await Bear.findById(req.params.bear_id);
+      res.json(bear);
+    } catch (err) {
+      res.status(500).send(err);
+    }
+  })
+  .put(async (req, res) => {
+    try {
+      const bear = await Bear.findById(req.params.bear_id);
+      bear.name = req.body.name;
+      await bear.save();
+      res.json({ message: 'Bear updated!' });
+    } catch (err) {
+      res.status(500).send(err);
+    }
+  })
+  .delete(async (req, res) => {
+    try {
+      await Bear.findByIdAndDelete(req.params.bear_id);
+      res.json({ message: 'Successfully deleted' });
+    } catch (err) {
+      res.status(500).send(err);
+    }
+  });
 
-		bear.save(function(err) {
-			if (err)
-				res.send(err);
-
-			res.json({ message: 'Bear created!' });
-		});
-
-		
-	})
-
-	// get all the bears (accessed at GET http://localhost:8080/api/bears)
-	.get(function(req, res) {
-		Bear.find(function(err, bears) {
-			if (err)
-				res.send(err);
-
-			res.json(bears);
-		});
-	});
-
-// on routes that end in /bears/:bear_id
-// ----------------------------------------------------
-router.route('/bears/:bear_id')
-
-	// get the bear with that id
-	.get(function(req, res) {
-		Bear.findById(req.params.bear_id, function(err, bear) {
-			if (err)
-				res.send(err);
-			res.json(bear);
-		});
-	})
-
-	// update the bear with this id
-	.put(function(req, res) {
-		Bear.findById(req.params.bear_id, function(err, bear) {
-
-			if (err)
-				res.send(err);
-
-			bear.name = req.body.name;
-			bear.save(function(err) {
-				if (err)
-					res.send(err);
-
-				res.json({ message: 'Bear updated!' });
-			});
-
-		});
-	})
-
-	// delete the bear with this id
-	.delete(function(req, res) {
-		Bear.remove({
-			_id: req.params.bear_id
-		}, function(err, bear) {
-			if (err)
-				res.send(err);
-
-			res.json({ message: 'Successfully deleted' });
-		});
-	});
-
-
-// REGISTER OUR ROUTES -------------------------------
+// =============================================================================
+// REGISTER ROUTES
+// =============================================================================
 app.use('/api', router);
 
-// START THE SERVER
 // =============================================================================
-app.listen(3000, () => {
-  console.log('Server running on port 3000');
+// START SERVER
+// =============================================================================
+app.listen(port, () => {
+  console.log(`Server running on port ${port}`);
 });
