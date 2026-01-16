@@ -1,18 +1,21 @@
 // BASE SETUP
 // =============================================================================
 import express from 'express';
+import bodyParser from 'body-parser';
+import mongoose from 'mongoose';
 
 // call the packages we need
-var bodyParser = require('body-parser');
-var app        = express();
-var morgan     = require('morgan');
+const app = express();
 
 // configure app
 app.use(morgan('dev')); // log requests to the console
 
 // configure body parser
-app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
+
+app.get('/', (req, res) => {
+  res.send('API Node.js OK');
+});
 
 var port     = process.env.PORT || 8080; // set our port
 
